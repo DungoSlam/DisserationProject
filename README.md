@@ -249,24 +249,6 @@ ax1.legend(prop=dict(size=12))
 ax1.set_xlabel('$x$')
 ax1.set_ylabel(r'$|\psi(x)|$')
 
-# # bottom axes show the k-space data
-# ymin = abs(S.psi_k).min()
-# ymax = abs(S.psi_k).max()
-# ax2 = fig.add_subplot(212, xlim=klim,
-#                       ylim=(ymin - 0.2 * (ymax - ymin),
-#                             ymax + 0.2 * (ymax - ymin)))
-# psi_k_line, = ax2.plot([], [], c='r', label=r'$|\psi(k)|$')
-#
-# p0_line1 = ax2.axvline(-p0 / hbar, c='k', ls=':', label=r'$\pm p_0$')
-# p0_line2 = ax2.axvline(p0 / hbar, c='k', ls=':')
-# mV_line = ax2.axvline(np.sqrt(2 * V0) / hbar, c='k', ls='--',
-#                       label=r'$\sqrt{2mV_0}$')
-# ax2.legend(prop=dict(size=12))
-# ax2.set_xlabel('$k$')
-# ax2.set_ylabel(r'$|\psi(k)|$')
-#
-# V_x_line.set_data(S.x, S.V_x)
-
 ######################################################################
 # Animate plot
 def init():
