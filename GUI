@@ -8,13 +8,16 @@ class Window(Frame):
         self.master = master
 root = Tk()
 root.title('Quantum Tunneling Simulation')
+img = PhotoImage(file = r'C:\Users\Mickey\Desktop\Chemistry\3011\Chemistry.png')
+root.tk.call('wm', 'iconphoto', root._w, img)
 app = Window(root)
 
 # Layout
-root.geometry("1320x600")
+root.geometry("980x600")
+root.resizable(0,0)
 topRightFrame = Frame(root)
 topRightFrame.grid(row = 0, column = 1)
-topLeftFrame = Frame(root, height =500, width = 800)
+topLeftFrame = Frame(root, height =500, width = 800, bg = 'white')
 topLeftFrame.grid(row = 0, column = 0)
 bottomLeftFrame = Frame(root)
 bottomLeftFrame.grid(row = 1, column =0)
@@ -22,13 +25,13 @@ bottomRightFrame = Frame(root)
 bottomRightFrame.grid(row = 1, column =1)
 
 # Slider code
-Thickness = Scale(bottomLeftFrame, from_=0, to = 5, orient = HORIZONTAL, length = 200)
-Thickness.grid()
+Thickness = Scale(bottomLeftFrame, from_=0, to = 10, orient = HORIZONTAL, length = 200, resolution = 0.5)
+Thickness.grid(padx = 50)
 labelT = StringVar()
 labelT.set('Barrier Thickness')
 ThicknessL = Label(bottomLeftFrame, textvariable = labelT)
 ThicknessL.grid(row=1)
-Potential = Scale(topRightFrame, from_=5, to = 0, orient = VERTICAL, length = 200)
+Potential = Scale(topRightFrame, from_=10, to = 0, orient = VERTICAL, length = 200, resolution = 0.5)
 Potential.grid(row = 1, column = 0)
 labelP = StringVar()
 labelP.set('Potential')
@@ -36,16 +39,34 @@ PotentialL = Label(topRightFrame, textvariable = labelP)
 PotentialL.grid(column = 1, row = 0)
 
 # Entry's
-particleMass = Entry(topRightFrame)
-particleMass.grid(row = 1, column = 2)
+particleMass = Scale(bottomLeftFrame, from_=0, to = 10, orient = HORIZONTAL, length = 200, resolution = 0.5)
+particleMass.grid(row = 0, column =1)
 labelM = StringVar()
-labelM.set('Particle Mass (0-5)')
-particleMassT = Label(topRightFrame, textvariable = labelM)
-particleMassT.grid(row=1, column=3)
+labelM.set('Particle Mass \n(For best results try between 0-5)')
+particleMassT = Label(bottomLeftFrame, textvariable = labelM, height = 0)
+particleMassT.grid(row=1, column=1)
 
 # Simulate
 # The button that will collect all the data from the GUI and give it to the simulation to then run
 def CollectData():
+    """A quick function to use as the command on the simulate button
+        it collects and then assigns the variables used in the simulation
+        and then runs the simulation itself"""
+    mass = particleMass.get()
+    barrierThick = Thickness.get()
+    potential = Potential.get()
+    try:
+        THCK = 5*barrierThick
+        V0 = potential/1000
+        m = float(mass)/2
+        print(THCK,V0 ,m)
+    except ValueError:
+        pass
 
-simulateButton = Button(bottomRightFrame, text = 'Simulate!')
+simulateButton = Button(bottomRightFrame, text = 'Simulate!', command = CollectData, width = 20, height = 4, bg = 'green',
+                        fg = 'white')
 simulateButton.grid()
+
+
+
+root.mainloop()
