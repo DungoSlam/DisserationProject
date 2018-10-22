@@ -1,3 +1,6 @@
+#       Updated for Python 3.6 and changed from using Pylab to matplotlib as it fuctions better outside of IPython notebooks
+#       However the animation aspect of it is no longer functioning with no clear reason why
+
 #=============================================================================
 #
 #               Quantum Mechanical Simulation using Finite-Difference
