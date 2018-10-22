@@ -4,41 +4,41 @@
 
 #=============================================================================
 #
-#               Quantum Mechanical Simulation using Finite-Difference
-#               Time-Domain (FDTD) Method
+#.               Quantum Mechanical Simulation using Finite-Difference
+#.               Time-Domain (FDTD) Method
 #
-#       This script simulates a probability wave in the presence of multiple
-#       potentials.  The simulation is c arried out by using the FDTD algorithm
-#       applied to the Schrodinger equation.  The program is intended to act as
-#       a demonstration of the FDTD algorithm and can be used as an educational
-#       aid for quantum mechanics and numerical methods.  The simulation
-#       parameters are defined in the code constants and can be freely
-#       manipulated to see different behaviors.
+#.       This script simulates a probability wave in the presence of multiple
+#.       potentials.  The simulation is c arried out by using the FDTD algorithm
+#.       applied to the Schrodinger equation.  The program is intended to act as
+#.       a demonstration of the FDTD algorithm and can be used as an educational
+#.       aid for quantum mechanics and numerical methods.  The simulation
+#.       parameters are defined in the code constants and can be freely
+#.       manipulated to see different behaviors.
 #
-#       NOTES
+#.       NOTES
 #
-#       The probability density plots are amplified by a factor for visual
-#       purposes.  The psi_p quanity contains the actual probability density
-#       without any rescaling.
+#.       The probability density plots are amplified by a factor for visual
+#.       purposes.  The psi_p quanity contains the actual probability density
+#.       without any rescaling.
 #
-#       BEWARE: The time step, dt, has strict requirements or else the
-#       simulation becomes unstable.
+#.       BEWARE: The time step, dt, has strict requirements or else the
+#.       simulation becomes unstable.
 #
-#       The code has three built-in potential functions for demonstration.
+#.       The code has three built-in potential functions for demonstration.
 #
-#       1) Constant potential: Demonstrates a free particle with dispersion.
+#.       1) Constant potential: Demonstrates a free particle with dispersion.
 #
-#       2) Step potential: Demonstrates transmission and reflection.
+#.       2) Step potential: Demonstrates transmission and reflection.
 #
-#       3) Potential barrier: Demonstrates tunneling.
+#.       3) Potential barrier: Demonstrates tunneling.
 #
-#       By tweaking the height of the potential (V0 below) as well as the
-#       barrier thickness (THCK below), you can see different behaviors: full
-#       reflection with no noticeable transmission, transmission and
-#       reflection, or mostly transmission with tunneling.
+#.       By tweaking the height of the potential (V0 below) as well as the
+#.       barrier thickness (THCK below), you can see different behaviors: full
+#.       reflection with no noticeable transmission, transmission and
+#.       reflection, or mostly transmission with tunneling.
 #
-#               This script requires pylab and numpy to be installed with
-#               Python or else it will not run.
+#.               This script requires pylab and numpy to be installed with
+#.               Python or else it will not run.
 #
 #============================================================================
 # Author:  James Nagel <nagel@mers.byu.edu>
@@ -46,17 +46,17 @@
 #
 # Updates by Fernando Perez <Fernando.Perez@colorado.edu>, 7/28/07
 #============================================================================
-#  Numerical and plotting libraries
+#.  Numerical and plotting libraries
 import numpy as np
 import pylab
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-# Set pylab to interactive mode so plots update when run outside ipython
+#. Set pylab to interactive mode so plots update when run outside ipython
 plt.ion()
 #=============================================================================
 # Utility functions
-#  Defines a quick Gaussian pulse function to act as an envelope to the wave
-#  function.
+#.  Defines a quick Gaussian pulse function to act as an envelope to the wave
+#.  function.
 def Gaussian(x,t,sigma):
     """  A Gaussian curve.
         x = Variable
@@ -87,8 +87,8 @@ def fillax(x,y,*args,**kw):
 
 #=============================================================================
 #
-#  Simulation Constants.  Be sure to include decimal points on appropriate
-#  variables so they become floats instead of integers.
+#.  Simulation Constants.  Be sure to include decimal points on appropriate
+#. variables so they become floats instead of integers.
 #
 N    = 1200     #  Number of spatial points.
 T    = 5*N      #  Number of time steps.  5*N is a nice value for terminating
@@ -98,30 +98,30 @@ dx   = 1.0e0    #  Spatial resolution
 m    = 1.0e0    #  Particle mass
 hbar = 1.0e0    #  Plank's constant
 X    = dx*np.linspace(0,N,N)        #  Spatial axis.
-# Potential parameters.  By playing with the type of potential and the height
-# and thickness (for barriers), you'll see the various transmission/reflection
-# regimes of quantum mechanical tunneling.
+#. Potential parameters.  By playing with the type of potential and the height
+#. and thickness (for barriers), you'll see the various transmission/reflection
+#. regimes of quantum mechanical tunneling.
 V0   = 5.0e-3   #  Potential amplitude (used for steps and barriers)
 THCK = 20     # "Thickness" of the potential barrier (if appropriate
                 # V-function is chosen)
-# Uncomment the potential type you want to use here:
-# Zero potential, packet propagates freely.
+#. Uncomment the potential type you want to use here:
+#. Zero potential, packet propagates freely.
 #POTENTIAL = 'free'
-# Potential step.  The height (V0) of the potential chosen above will determine
-# the amount of reflection/transmission you'll observe
+#. Potential step.  The height (V0) of the potential chosen above will determine
+#. the amount of reflection/transmission you'll observe
 #POTENTIAL = 'step'
-# Potential barrier.  Note that BOTH the potential height (V0) and thickness
-# of the barrier (THCK) affect the amount of tunneling vs reflection you'll
-# observe.
+#. Potential barrier.  Note that BOTH the potential height (V0) and thickness
+#. of the barrier (THCK) affect the amount of tunneling vs reflection you'll
+#. observe.
 POTENTIAL = 'barrier'
-#  Initial wave function constants
+#.  Initial wave function constants
 sigma = 40.0 # Standard deviation on the Gaussian envelope (remember Heisenberg
              #  uncertainty).
 x0 = round(N/2) - 5*sigma # Time shift
 k0 = np.pi/20 # Wavenumber (note that energy is a function of k)
-# Energy for a localized gaussian wavepacket interacting with a localized
-# potential (so the interaction term can be neglected by computing the energy
-# integral over a region where V=0)
+#. Energy for a localized gaussian wavepacket interacting with a localized
+#. potential (so the interaction term can be neglected by computing the energy
+#. integral over a region where V=0)
 E = (hbar**2/2.0/m)*(k0**2+0.5/sigma**2)
 #=============================================================================
 # Code begins
