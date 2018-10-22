@@ -1,0 +1,51 @@
+from tkinter import *
+from tkinter import ttk
+
+class Window(Frame):
+
+    def __init__(self, master=None):
+        Frame.__init__(self, master)
+        self.master = master
+root = Tk()
+root.title('Quantum Tunneling Simulation')
+app = Window(root)
+
+# Layout
+root.geometry("1320x600")
+topRightFrame = Frame(root)
+topRightFrame.grid(row = 0, column = 1)
+topLeftFrame = Frame(root, height =500, width = 800)
+topLeftFrame.grid(row = 0, column = 0)
+bottomLeftFrame = Frame(root)
+bottomLeftFrame.grid(row = 1, column =0)
+bottomRightFrame = Frame(root)
+bottomRightFrame.grid(row = 1, column =1)
+
+# Slider code
+Thickness = Scale(bottomLeftFrame, from_=0, to = 5, orient = HORIZONTAL, length = 200)
+Thickness.grid()
+labelT = StringVar()
+labelT.set('Barrier Thickness')
+ThicknessL = Label(bottomLeftFrame, textvariable = labelT)
+ThicknessL.grid(row=1)
+Potential = Scale(topRightFrame, from_=5, to = 0, orient = VERTICAL, length = 200)
+Potential.grid(row = 1, column = 0)
+labelP = StringVar()
+labelP.set('Potential')
+PotentialL = Label(topRightFrame, textvariable = labelP)
+PotentialL.grid(column = 1, row = 0)
+
+# Entry's
+particleMass = Entry(topRightFrame)
+particleMass.grid(row = 1, column = 2)
+labelM = StringVar()
+labelM.set('Particle Mass (0-5)')
+particleMassT = Label(topRightFrame, textvariable = labelM)
+particleMassT.grid(row=1, column=3)
+
+# Simulate
+# The button that will collect all the data from the GUI and give it to the simulation to then run
+def CollectData():
+
+simulateButton = Button(bottomRightFrame, text = 'Simulate!')
+simulateButton.grid()
