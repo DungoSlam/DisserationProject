@@ -1,72 +1,319 @@
 from tkinter import *
 from tkinter import ttk
+import matplotlib
+matplotlib.use("TkAgg")
+import numpy as np
+import time
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import queue
+import threading
 
-class Window(Frame):
+def Gaussian(x,t,sigma):
+    """  A Gaussian curve.
+        x = Variable
+        t = time shift
+        sigma = standard deviation      """
+    return np.exp(-(x-t)**2/(2*sigma**2))
+def free(npts):
+    """Free particle."""
+    return np.zeros(npts)
+def step(npts,v0):
+    """Potential step"""
+    v = free(npts)
+    v[int(npts/2):] = v0
+    return v
+def barrier(npts,v0,thickness):
+    """"Barrier potential"""
+    v = free(npts)
+    v[int(npts/2):int(npts/2+thickness)] = v0
+    return v
+def fillax(x,y,*args,**kw):
+    """Fill the space between an array of y values and the x axis.
+    All args/kwargs are passed to the pylab.fill function.
+    Returns the value of the pylab.fill() call.
+    """
+    xx = np.concatenate((x,np.array([x[-1],x[0]],x.dtype)))
+    yy = np.concatenate((y,np.zeros(2,y.dtype)))
+    return plt.fill(xx, yy, *args,**kw)
 
-    def __init__(self, master=None):
-        Frame.__init__(self, master)
+#=============================================================================
+#
+#  Simulation Constants.  Be sure to include decimal points on appropriate
+#  variables so they become floats instead of integers.
+#
+
+#=============================================================================
+# Code begins
+#
+# You shouldn't need to change anything below unless you want to actually play
+# with the numerical algorithm or modify the plotting.
+#
+#  Fill in the appropriate potential function (is there a Python equivalent to
+#  the SWITCH statement?).
+
+#  More simulation parameters.  The maximum stable time step is a function of
+#  the potential, V.
+N = 1200  # Number of spatial points.
+T = 5 * N  # Number of time steps.  5*N is a nice value for terminating
+Tp = 100  # Number of time steps to increment before updating the plot.
+dx = 1.0e0  # Spatial resolution
+hbar = 1.0e0  # Plank's constant
+X = dx * np.linspace(0, N, N)  # Spatial axis.
+k0 = np.pi / 20  # Wavenumber (note that energy is a function of k)
+POTENTIAL = 'barrier'
+sigma = 40.0  # Standard deviation on the Gaussian envelope (remember Heisenberg
+        #  uncertainty).
+x0 = round(N / 2) - 5 * sigma  # Time shift
+
+
+class GUI():
+    def __init__(self, master):
         self.master = master
+        self.topRightFrame = Frame(self.master)
+        self.topRightFrame.grid(row = 0, column = 1)
+        self.master.geometry("980x600")
+        self.master.resizable(0, 0)
+        self.topLeftFrame = Frame(self.master, height=500, width=800, bg='white')
+        self.topLeftFrame.grid(row=0, column=0)
+        self.bottomLeftFrame = Frame(self.master)
+        self.bottomLeftFrame.grid(row=1, column=0)
+        self.bottomRightFrame = Frame(self.master)
+        self.bottomRightFrame.grid(row=1, column=1)
+        self.Thickness = Scale(self.bottomLeftFrame, from_=0, to=10, orient=HORIZONTAL, length=200, resolution=0.5)
+        self.Thickness.grid(padx=50)
+        self.labelT = StringVar()
+        self.labelT.set('Barrier Thickness')
+        self.ThicknessL = Label(self.bottomLeftFrame, textvariable=self.labelT, font=('Arial', '12'))
+        self.ThicknessL.grid(row=1)
+        self.Thickness.set(5)
+        self.Potential = Scale(self.topRightFrame, from_=10, to=0, orient=VERTICAL, length=200, resolution=0.5)
+        self.Potential.grid(row=1, column=0)
+        self.labelP = StringVar()
+        self.labelP.set('Potential')
+        self.PotentialL = Label(self.topRightFrame, textvariable=self.labelP, font=('Arial', '12'), justify=CENTER)
+        self.PotentialL.grid(column=0, row=0)
+        self.Potential.set(5)
+        self.particleMass = Scale(self.bottomLeftFrame, from_=0.5, to=5, orient=HORIZONTAL, length=200, resolution=0.5)
+        self.particleMass.grid(row=0, column=1)
+        self.labelM = StringVar()
+        self.labelM.set('Particle Mass')
+        self.particleMassT = Label(self.bottomLeftFrame, textvariable=self.labelM, font=('Arial', '12'))
+        self.particleMassT.grid(row=1, column=1)
+        self.particleMass.set(2.5)
+        self.simulateButton = Button(self.bottomRightFrame, text='Simulate!', command=self.simulation, width=20,
+                                     height=4, bg='green',
+                                     fg='white')
+        self.simulateButton.grid()
+        self.m = self.CollectDatam()
+        self.V0 = self.CollectDataV0()
+        self.THCK = self.CollectDataTHCK()
+
+
+
+
+    def GuassianFunc(self, THCK, m, V0):
+        # Variable Init
+
+        self.m = m
+        # Potential parameters.  By playing with the type of potential and the height
+        # and thickness (for barriers), you'll see the various transmission/reflection
+        # regimes of quantum mechanical tunneling.
+        self.V0 = V0  # Potential amplitude (used for steps and barriers)
+        self.THCK = THCK  # "Thickness" of the potential barrier (if appropriate
+        # V-function is chosen)
+        if POTENTIAL == 'barrier':
+            self.V = barrier(N, self.V0, self.THCK)
+        else:
+            raise ValueError("Unrecognized potential type: %s" % POTENTIAL)
+        # Uncomment the potential type you want to use here:
+        # Zero potential, packet propagates freely.
+        # POTENTIAL = 'free'
+        # Potential step.  The height (V0) of the potential chosen above will determine
+        # the amount of reflection/transmission you'll observe
+        # POTENTIAL = 'step'
+        # Potential barrier.  Note that BOTH the potential height (V0) and thickness
+        # of the barrier (THCK) affect the amount of tunneling vs reflection you'll
+        # observe.
+
+        self.E = (hbar ** 2 / 2.0 / self.m) * (k0 ** 2 + 0.5 / sigma ** 2)
+        self.Vmax = self.V.max()  # Maximum potential of the domain.
+        self.dt = hbar / (2 * hbar ** 2 / (self.m * dx ** 2) + self.Vmax)  # Critical time step.
+        self.c1 = hbar * self.dt / (self.m * dx ** 2)  # Constant coefficient 1.
+        self.c2 = 2 * self.dt / hbar  # Constant coefficient 2.
+        self.c2V = self.c2 * self.V  # pre-compute outside of update loop
+        #  Wave functions.  Three states represent past, present, and future.
+        self.psi_r = np.zeros((3, N))  # Real
+        self.psi_i = np.zeros((3, N))  # Imaginary
+        self.psi_p = np.zeros(N, )  # Observable probability (magnitude-squared
+        #  of the complex wave function).
+        #  Temporal indexing constants, used for accessing rows of the wavefunctions.
+        self.PA = 0  # Past
+        self.PR = 1  # Present
+        self.FU = 2  # Future
+        #  Initialize wave function.  A present-only state will "split" with half the
+        #  wave function propagating to the left and the other half to the right.
+        #  Including a "past" state will cause it to propagate one way.
+        self.xn = range(1, int(N / 2))
+        self.x = X[self.xn] / dx  # Normalized position coordinate
+        self.gg = Gaussian(self.x, x0, sigma)
+        self.cx = np.cos(k0 * self.x)
+        self.sx = np.sin(k0 * self.x)
+        self.psi_r[self.PR, self.xn] = self.cx * self.gg
+        self.psi_i[self.PR, self.xn] = self.sx * self.gg
+        self.psi_r[self.PA, self.xn] = self.cx * self.gg
+        self.psi_i[self.PA, self.xn] = self.sx * self.gg
+        # Initial normalization of wavefunctions
+        #   Compute the observable probability.
+        self.psi_p = self.psi_r[self.PR] ** 2 + self.psi_i[self.PR] ** 2
+        #     Normalize the wave functions so that the total probability in the simulation
+        #  is equal to 1.
+        P = dx * self.psi_p.sum()  # Total probability.
+        nrm = np.sqrt(P)
+        self.psi_r /= nrm
+        self.psi_i /= nrm
+        self.psi_p /= P
+
+        self.IDX1 = range(1, N - 1)  # psi [ k ]
+        self.IDX2 = range(2, N)  # psi [ k + 1 ]
+        self.IDX3 = range(0, N - 2)  # psi [ k - 1 ]
+
+    def Graph(self):
+        self.Fig = plt.figure()
+        self.xmin = X.min()
+        self.xmax = X.max()
+        self.ymax = 1.5 * (self.psi_r[self.PR]).max()
+        plt.axis([self.xmin, self.xmax, -self.ymax, self.ymax])
+        #  Initialize the plots with their own line objects.  The figures plot MUCH
+        #  faster if you simply update the lines as opposed to redrawing the entire
+        #  figure.  For reference, include the potential function as well.
+        self.lineR, = plt.plot(X, self.psi_r[self.PR], 'b', alpha=0.7, label='Real')
+        self.lineI, = plt.plot(X, self.psi_i[self.PR], 'r', alpha=0.7, label='Imag')
+        self.lineP, = plt.plot(X, 6 * self.psi_p, 'k', label='Prob')
+        plt.title('Potential height: %.2e' % self.V0)
+        # For non-zero potentials, plot them and shade the classically forbidden region
+        # in light red, as well as drawing a green line at the wavepacket's total
+        # energy, in the same units the potential is being plotted.
+        if self.Vmax != 0:
+            # Scaling factor for energies, so they fit in the same plot as the
+            # wavefunctions
+            Efac = self.ymax / 2.0 / self.Vmax
+            V_plot = self.V * Efac
+            plt.plot(X, V_plot, ':k', zorder=0)  # Potential line.
+            fillax(X, V_plot, facecolor='y', alpha=0.2, zorder=0)
+            # Plot the wavefunction energy, in the same scale as the potential
+            plt.axhline(self.E * Efac, color='g', label='Energy', zorder=1)
+        plt.legend(loc='lower right')
+        plt.xlim(self.xmin, self.xmax)
+        self.canvas = FigureCanvasTkAgg(self.Fig, self.topLeftFrame)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().grid()
+
+
+
+
+
+    def CollectDataTHCK(self):
+        """A quick function to use as the command on the simulate button
+            it collects and then assigns the variables used in the simulation
+            and then runs the simulation itself"""
+
+        self.THCK = 2 * self.Thickness.get()
+
+        return self.THCK
+    def CollectDatam(self):
+        self.m = float(self.particleMass.get()) / 2
+        return self.m
+
+    def CollectDataV0(self):
+        self.V0 = self.Potential.get() / 250
+        return self.V0
+
+    def click(self):
+        self.CollectData()
+
+        self.queue = queue.Queue()
+        ThreadedTask(self.queue).start()
+        self.master.after(100, self.process_queue)
+
+    def process_queue(self):
+        try:
+            msg = self.queue.get(0)
+            # Show result of the task if needed
+            self.prog_bar.stop()
+        except queue.Empty:
+            self.master.after(100, self.process_queue)
+
+    # def Graph(self):
+
+
+       # plt.show()
+       # I think there's a problem with pylab, because it resets the xlim after
+       # plotting the E line.  Fix it back manually.
+
+    def init(self):
+        self.lineI.set_data([X], [0])
+        self.lineP.set_data([X], [0])
+        self.lineR.set_data([X], [0])
+        return self.lineI, self.lineP, self.lineR
+
+    def animate(self, other):
+        for t in range(0,10):
+            self.psi_rPR = self.psi_r[self.PR]
+            self.psi_iPR = self.psi_i[self.PR]
+            #  Apply the update equations.
+            self.psi_i[self.FU, self.IDX1] = self.psi_i[self.PA, self.IDX1] + \
+                                             self.c1 * (self.psi_rPR[self.IDX2] - 2 * self.psi_rPR[self.IDX1] +
+                                                        self.psi_rPR[self.IDX3])
+            self.psi_i[self.FU] -= self.c2V * self.psi_r[self.PR]
+
+            self.psi_r[self.FU, self.IDX1] = self.psi_r[self.PA, self.IDX1] - \
+                                             self.c1 * (self.psi_iPR[self.IDX2] - 2 * self.psi_iPR[self.IDX1] +
+                                                        self.psi_iPR[self.IDX3])
+            self.psi_r[self.FU] += self.c2V * self.psi_i[self.PR]
+        #  Increment the time steps.  PR -> PA and FU -> PR
+            self.psi_r[self.PA] = self.psi_rPR
+            self.psi_r[self.PR] = self.psi_r[self.FU]
+            self.psi_i[self.PA] = self.psi_iPR
+            self.psi_i[self.PR] = self.psi_i[self.FU]
+        #  Only plot after a few iterations to make the simulation run faster.
+        # if t % Tp == 0:
+        #  Compute observable probability for the plot.
+            self.psi_p = self.psi_r[self.PR] ** 2 + self.psi_i[self.PR] ** 2
+        #  Update the plots.
+            self.lineR.set_ydata(self.psi_r[self.PR])
+            self.lineI.set_ydata(self.psi_i[self.PR])
+        # Note: we plot the probability density amplified by a factor so it's a
+        # bit easier to see.
+            self.lineP.set_ydata(6 * self.psi_p)
+        return self.lineP, self.lineI, self.lineR
+
+
+
+    def simulation(self):
+        self.GuassianFunc(self.CollectDataTHCK(), self.CollectDatam(), self.CollectDataV0())
+        print(self.m, self.THCK, self.V0)
+        self.Graph()
+
+        ani = animation.FuncAnimation(self.Fig, self.animate, init_func=self.init, interval=0.01, frames=1200, blit=True)
+        self.canvas.draw()
+class ThreadedTask(threading.Thread):
+    def __init__(self, queue):
+        threading.Thread.__init__(self)
+        self.queue = queue
+
+    def run(self):
+        time.sleep(5)  # Simulate long running process
+        self.queue.put("Task finished")
+
+
+    # def playanimation(self):
+    #     self.ani = animation.FuncAnimation(Fig, animate, init_func=init, interval=0.01, frames=1200, blit=True)
+
+
+
 root = Tk()
-root.title('Quantum Tunneling Simulation')
-img = PhotoImage(file = r'C:\Users\Mickey\Desktop\Chemistry\3011\Chemistry.png')
-root.tk.call('wm', 'iconphoto', root._w, img)
-app = Window(root)
-
-# Layout
-root.geometry("980x600")
-root.resizable(0,0)
-topRightFrame = Frame(root)
-topRightFrame.grid(row = 0, column = 1)
-topLeftFrame = Frame(root, height =500, width = 800, bg = 'white')
-topLeftFrame.grid(row = 0, column = 0)
-bottomLeftFrame = Frame(root)
-bottomLeftFrame.grid(row = 1, column =0)
-bottomRightFrame = Frame(root)
-bottomRightFrame.grid(row = 1, column =1)
-
-# Slider code
-Thickness = Scale(bottomLeftFrame, from_=0, to = 10, orient = HORIZONTAL, length = 200, resolution = 0.5)
-Thickness.grid(padx = 50)
-labelT = StringVar()
-labelT.set('Barrier Thickness')
-ThicknessL = Label(bottomLeftFrame, textvariable = labelT)
-ThicknessL.grid(row=1)
-Potential = Scale(topRightFrame, from_=10, to = 0, orient = VERTICAL, length = 200, resolution = 0.5)
-Potential.grid(row = 1, column = 0)
-labelP = StringVar()
-labelP.set('Potential')
-PotentialL = Label(topRightFrame, textvariable = labelP)
-PotentialL.grid(column = 1, row = 0)
-
-# Entry's
-particleMass = Scale(bottomLeftFrame, from_=0, to = 10, orient = HORIZONTAL, length = 200, resolution = 0.5)
-particleMass.grid(row = 0, column =1)
-labelM = StringVar()
-labelM.set('Particle Mass \n(For best results try between 0-5)')
-particleMassT = Label(bottomLeftFrame, textvariable = labelM, height = 0)
-particleMassT.grid(row=1, column=1)
-
-# Simulate
-# The button that will collect all the data from the GUI and give it to the simulation to then run
-def CollectData():
-    """A quick function to use as the command on the simulate button
-        it collects and then assigns the variables used in the simulation
-        and then runs the simulation itself"""
-    mass = particleMass.get()
-    barrierThick = Thickness.get()
-    potential = Potential.get()
-    try:
-        THCK = 5*barrierThick
-        V0 = potential/1000
-        m = float(mass)/2
-        print(THCK,V0 ,m)
-    except ValueError:
-        pass
-
-simulateButton = Button(bottomRightFrame, text = 'Simulate!', command = CollectData, width = 20, height = 4, bg = 'green',
-                        fg = 'white')
-simulateButton.grid()
-
-
+Main_ui = GUI(root)
 
 root.mainloop()
