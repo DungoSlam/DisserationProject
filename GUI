@@ -10,6 +10,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import queue
 import threading
 
+
+### Helper Functions ###
 def Gaussian(x,t,sigma):
     """  A Gaussian curve.
         x = Variable
@@ -38,23 +40,9 @@ def fillax(x,y,*args,**kw):
     yy = np.concatenate((y,np.zeros(2,y.dtype)))
     return plt.fill(xx, yy, *args,**kw)
 
-#=============================================================================
-#
-#  Simulation Constants.  Be sure to include decimal points on appropriate
-#  variables so they become floats instead of integers.
-#
 
-#=============================================================================
 # Code begins
-#
-# You shouldn't need to change anything below unless you want to actually play
-# with the numerical algorithm or modify the plotting.
-#
-#  Fill in the appropriate potential function (is there a Python equivalent to
-#  the SWITCH statement?).
-
-#  More simulation parameters.  The maximum stable time step is a function of
-#  the potential, V.
+# Simulation Constants
 N = 1200  # Number of spatial points.
 T = 5 * N  # Number of time steps.  5*N is a nice value for terminating
 Tp = 100  # Number of time steps to increment before updating the plot.
@@ -70,12 +58,13 @@ x0 = round(N / 2) - 5 * sigma  # Time shift
 
 class GUI():
     def __init__(self, master):
+        """initialises the GUI and its various widgets"""
         self.master = master
         self.topRightFrame = Frame(self.master)
         self.topRightFrame.grid(row = 0, column = 1)
-        self.master.geometry("980x600")
+        self.master.geometry("1200x700")
         self.master.resizable(0, 0)
-        self.topLeftFrame = Frame(self.master, height=500, width=800, bg='white')
+        self.topLeftFrame = Frame(self.master, height=600, width=951, bg='white')
         self.topLeftFrame.grid(row=0, column=0)
         self.bottomLeftFrame = Frame(self.master)
         self.bottomLeftFrame.grid(row=1, column=0)
@@ -102,18 +91,55 @@ class GUI():
         self.particleMassT = Label(self.bottomLeftFrame, textvariable=self.labelM, font=('Arial', '12'))
         self.particleMassT.grid(row=1, column=1)
         self.particleMass.set(2.5)
-        self.simulateButton = Button(self.bottomRightFrame, text='Simulate!', command=self.simulation, width=20,
-                                     height=4, bg='green',
+        self.simulateButton = Button(self.bottomRightFrame, text='Simulate!', command=self.simulation, height=4, width=10,
+                                     bg='green',
                                      fg='white')
-        self.simulateButton.grid()
+        self.simulateButton.grid(column=0,row=0)
+        self.resetButton = Button(self.bottomRightFrame, text='Reset!', command=self.reset, bg='red',height=4, width=10,
+                                     fg='white', state='disabled')
+        self.resetButton.grid(row=0,column=1)
         self.m = self.CollectDatam()
         self.V0 = self.CollectDataV0()
         self.THCK = self.CollectDataTHCK()
 
 
 
+    def GraphFig(self):
+        """Creates a base figure of the graph of just the axis and potential wall"""
+        self.graphFig, (self.wavesfig, self.densityfig) = plt.subplots(nrows=2, sharex='col', sharey='row', figsize=(9.5, 6))
+        self.xmin = X.min()
+        self.xmax = X.max()
+        self.ymax = 1.5 * (self.psi_r[self.PR]).max()
+        self.axis = ([self.xmin, self.xmax, -self.ymax, self.ymax])
+
+        if self.Vmax != 0:
+            # Scaling factor for energies, so they fit in the same plot as the
+            # wavefunctions
+            Efac = self.ymax / 2.0 / self.Vmax
+            V_plot = self.V * Efac
+            self.wavesfig.plot(X, V_plot, ':k', zorder=0)  # Potential line.
+            self.densityfig.plot(X, V_plot, ':k', zorder=0)  # Potential line.
+            fillax(X, V_plot, facecolor='y', alpha=0.2, zorder=0)
+            # Plot the wavefunction energy, in the same scale as the potential
+        self.wavesfig.set_xlim(self.xmin, self.xmax)
+        self.densityfig.set_xlim(self.xmin, self.xmax)
+        self.wavesfig.set_ylim(-self.ymax, self.ymax)
+        self.densityfig.set_ylim(-self.ymax, self.ymax)
+        self.graphcanvas = FigureCanvasTkAgg(self.graphFig, self.topLeftFrame)
+        self.graphcanvas.draw()
+        self.graphcanvas.get_tk_widget().grid()
+
+
+    def figureFrame(self):
+        """Initialises the frame where the graph and simulation to be remade later"""
+        self.topLeftFrame = Frame(self.master, height=600, width=951, bg='white')
+        self.topLeftFrame.grid(row=0, column=0)
 
     def GuassianFunc(self, THCK, m, V0):
+        """Function that takes 3 arguments, thickness of barrier, mass of particle and
+            Potential height of the barrier
+
+            Gives the solution and plots the graphs for quantum tunneling"""
         # Variable Init
 
         self.m = m
@@ -180,17 +206,18 @@ class GUI():
         self.IDX3 = range(0, N - 2)  # psi [ k - 1 ]
 
     def Graph(self):
-        self.Fig = plt.figure()
+        """Plots the graph with the real, imaginary and probability density and places it within the UI"""
+        self.Fig, (self.waves, self.density)= plt.subplots(nrows=2, sharex='col' , sharey='row', figsize =(9.5,6))
         self.xmin = X.min()
         self.xmax = X.max()
         self.ymax = 1.5 * (self.psi_r[self.PR]).max()
-        plt.axis([self.xmin, self.xmax, -self.ymax, self.ymax])
+        self.axis=([self.xmin, self.xmax, -self.ymax, self.ymax])
         #  Initialize the plots with their own line objects.  The figures plot MUCH
         #  faster if you simply update the lines as opposed to redrawing the entire
         #  figure.  For reference, include the potential function as well.
-        self.lineR, = plt.plot(X, self.psi_r[self.PR], 'b', alpha=0.7, label='Real')
-        self.lineI, = plt.plot(X, self.psi_i[self.PR], 'r', alpha=0.7, label='Imag')
-        self.lineP, = plt.plot(X, 6 * self.psi_p, 'k', label='Prob')
+        self.lineR, = self.waves.plot(X, self.psi_r[self.PR], 'b', alpha=0.7, label='Real')
+        self.lineI, = self.waves.plot(X, self.psi_i[self.PR], 'r', alpha=0.7, label='Imag')
+        self.lineP, = self.density.plot(X, 6 * self.psi_p, 'k', label='Prob')
         plt.title('Potential height: %.2e' % self.V0)
         # For non-zero potentials, plot them and shade the classically forbidden region
         # in light red, as well as drawing a green line at the wavepacket's total
@@ -200,27 +227,41 @@ class GUI():
             # wavefunctions
             Efac = self.ymax / 2.0 / self.Vmax
             V_plot = self.V * Efac
-            plt.plot(X, V_plot, ':k', zorder=0)  # Potential line.
+            self.waves.plot(X, V_plot, ':k', zorder=0)  # Potential line.
+            fillax(X, V_plot, facecolor='y', alpha=0.2, zorder=0)
+            self.density.plot(X, V_plot, ':k', zorder=0)  # Potential line.
             fillax(X, V_plot, facecolor='y', alpha=0.2, zorder=0)
             # Plot the wavefunction energy, in the same scale as the potential
-            plt.axhline(self.E * Efac, color='g', label='Energy', zorder=1)
-        plt.legend(loc='lower right')
-        plt.xlim(self.xmin, self.xmax)
+            self.waves.axhline(self.E * Efac, color='g', label='Energy', zorder=1)
+            self.density.axhline(self.E * Efac, color='g', label='Energy', zorder=1)
+        self.waves.legend(loc='lower right')
+        self.density.legend(loc='lower right')
+        self.waves.set_xlim(self.xmin, self.xmax)
+        self.density.set_xlim(self.xmin, self.xmax)
+        self.waves.set_ylim(-self.ymax, self.ymax)
+        self.density.set_ylim(-self.ymax, self.ymax)
+
         self.canvas = FigureCanvasTkAgg(self.Fig, self.topLeftFrame)
         self.canvas.draw()
         self.canvas.get_tk_widget().grid()
 
 
 
-
+    def reset(self):
+        """Command for reset button to remake the figure frame and re-enable the simulation
+            button"""
+        self.topLeftFrame.destroy()
+        self.figureFrame()
+        self.GraphFig()
+        self.graphcanvas.get_tk_widget().grid()
+        self.resetButton['state'] = 'disabled'
+        self.simulateButton['state'] = 'normal'
 
     def CollectDataTHCK(self):
-        """A quick function to use as the command on the simulate button
-            it collects and then assigns the variables used in the simulation
-            and then runs the simulation itself"""
+        """A collection of functions to collect the data submitted using the
+            siders in the UI"""
 
         self.THCK = 2 * self.Thickness.get()
-
         return self.THCK
     def CollectDatam(self):
         self.m = float(self.particleMass.get()) / 2
@@ -230,35 +271,16 @@ class GUI():
         self.V0 = self.Potential.get() / 250
         return self.V0
 
-    def click(self):
-        self.CollectData()
-
-        self.queue = queue.Queue()
-        ThreadedTask(self.queue).start()
-        self.master.after(100, self.process_queue)
-
-    def process_queue(self):
-        try:
-            msg = self.queue.get(0)
-            # Show result of the task if needed
-            self.prog_bar.stop()
-        except queue.Empty:
-            self.master.after(100, self.process_queue)
-
-    # def Graph(self):
-
-
-       # plt.show()
-       # I think there's a problem with pylab, because it resets the xlim after
-       # plotting the E line.  Fix it back manually.
-
     def init(self):
+        """initialise the data for the simulation function"""
         self.lineI.set_data([X], [0])
         self.lineP.set_data([X], [0])
         self.lineR.set_data([X], [0])
         return self.lineI, self.lineP, self.lineR
 
     def animate(self, other):
+        """animation function. Tt just updates all the plot points in a
+            recursive fashion"""
         for t in range(0,10):
             self.psi_rPR = self.psi_r[self.PR]
             self.psi_iPR = self.psi_i[self.PR]
@@ -292,28 +314,28 @@ class GUI():
 
 
     def simulation(self):
+        """command for simulation button
+            calls the simulation function and disables the simulation button
+            and re-enables the reset button"""
         self.GuassianFunc(self.CollectDataTHCK(), self.CollectDatam(), self.CollectDataV0())
         print(self.m, self.THCK, self.V0)
+        self.graphcanvas.get_tk_widget().grid_forget()
         self.Graph()
 
-        ani = animation.FuncAnimation(self.Fig, self.animate, init_func=self.init, interval=0.01, frames=1200, blit=True)
+        ani = animation.FuncAnimation(self.Fig, self.animate, init_func=self.init, interval=0.01, frames=500, blit=True, repeat=False)
         self.canvas.draw()
-class ThreadedTask(threading.Thread):
-    def __init__(self, queue):
-        threading.Thread.__init__(self)
-        self.queue = queue
+        self.simulateButton['state'] = 'disabled'
+        self.resetButton['state'] = 'normal'
 
-    def run(self):
-        time.sleep(5)  # Simulate long running process
-        self.queue.put("Task finished")
-
-
-    # def playanimation(self):
-    #     self.ani = animation.FuncAnimation(Fig, animate, init_func=init, interval=0.01, frames=1200, blit=True)
 
 
 
 root = Tk()
+root.title('Quantum Tunneling Simulation')
+#img = PhotoImage(file = r'C:\Users\Mickey\Desktop\Chemistry\3011\Chemistry.png')
+#root.tk.call('wm', 'iconphoto', root._w, img)
 Main_ui = GUI(root)
-
+Main_ui.figureFrame()
+Main_ui.GuassianFunc(10,1.25,0.02)
+Main_ui.GraphFig()
 root.mainloop()
